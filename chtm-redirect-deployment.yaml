@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chtm-me-redirect-deployment
+  namespace: chtm-web
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: chtm-me-redirect
+  template:
+    metadata:
+      labels:
+        app: chtm-me-redirect
+    spec:
+      containers:
+      - name: chtm-me-redirect
+        image: docker.io/nivirx/nginx-redirect:1.0.0
+        resources:
+          requests:
+            memory: "64Mi"
+            cpu: "200m"
+          limits:
+            memory: "128Mi"
+            cpu: "500m"
+        ports:
+          - containerPort: 80
+            name: http
+      imagePullSecrets:
+      - name: chtm-docker-regkey
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: chtm-me-redirect
+  namespace: chtm-web
+spec:
+  selector:
+    app: chtm-me-redirect
+  ports:
+  - protocol: TCP
+    port: 8080
+    targetPort: 80
+---
+apiVersion: projectcontour.io/v1
+kind: HTTPProxy
+metadata:
+  name: chtm-me-proxy
+  namespace: chtm-web
+spec:
+  routes:
+  - services:
+    - name: chtm-me-redirect
+      port: 8080
+  virtualhost:
+    fqdn: chtm.me
+    tls:
+      secretName: chtm-me-tls-prod
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: chtm-me-cert-prod
+  namespace: chtm-web
+spec:
+  commonName: chtm.me
+  dnsNames:
+  - chtm.me
+  issuerRef:
+    kind: ClusterIssuer
+    name: le-acme-prod
+  secretName: chtm-me-tls-prod
